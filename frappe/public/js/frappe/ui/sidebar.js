@@ -14,6 +14,7 @@ frappe.ui.Sidebar = class Sidebar {
 		this.sidebar_items = {
 			public: {},
 			private: {},
+			allowedApps : [],
 		};
 		this.indicator_colors = [
 			"green",
