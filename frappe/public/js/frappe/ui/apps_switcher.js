@@ -104,13 +104,13 @@ frappe.ui.AppsSwitcher = class AppsSwitcher {
 				return;
 			}
 			if (route.startsWith("/app/private")) {
-				this.set_current_app("private");
+				//this.set_current_app("private");
 				let ws = Object.values(frappe.workspace_map).find((ws) => ws.public === 0);
 				route += "/" + frappe.router.slug(ws.title);
 				frappe.set_route(route);
 			} else if (route.startsWith("/app")) {
 				frappe.set_route(route);
-				this.set_current_app(item.attr("data-app-name"));
+				//this.set_current_app(item.attr("data-app-name"));
 			} else {
 				// new page
 				window.open(route);
@@ -157,11 +157,11 @@ frappe.ui.AppsSwitcher = class AppsSwitcher {
 
 		frappe.frappe_toolbar.set_app_logo(app_data.app_logo_url);
 
-		if (frappe.current_app === app) return;
-		frappe.current_app = app;
+		//if (frappe.current_app === app) return;
+		//frappe.current_app = app;
 
 		// re-render the sidebar
-		frappe.app.sidebar.make_sidebar();
+		//frappe.app.sidebar.make_sidebar();
 	}
 
 	set_hover() {
