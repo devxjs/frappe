@@ -33,8 +33,14 @@ frappe.ui.Sidebar = class Sidebar {
 		this.setup_pages();
 		this.apps_switcher.populate_apps_menu();
 		this.handle_outside_click();
+		
 	}
-
+    replaceKeywords(text) {
+        return text
+            .replace("ERPNext", "ERP")
+            .replace("Framework", "Website Setting")
+            .replace("Member Portal", "Portal");
+    }
 	make_dom() {
 		this.set_default_app();
 		this.wrapper = $(frappe.render_template("sidebar")).prependTo("body");
