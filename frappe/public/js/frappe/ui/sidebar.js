@@ -200,8 +200,22 @@ frappe.ui.Sidebar = class Sidebar {
 			this.wrapper.find(".standard-sidebar-section").remove();
 		}
 
-		let app_workspaces = frappe.boot.app_data_map[frappe.current_app || "frappe"].workspaces;
+		//let app_workspaces = frappe.boot.app_data_map[frappe.current_app || "frappe"].workspaces;
+		let app_workspaces_data = Object.values(frappe.boot.app_data_map).flatMap(app => app.workspaces);
 
+		if(frappe.boot.navigation_profile){
+		var items=frappe.boot.navigation_profile.items;
+		items.forEach((item)=>{
+		this.sidebar_items.allowedApps.push({ parent_page: "", name: item.link, title: item.title});
+		});
+		}
+		// Debug: Output allowed apps
+		console.log("Allowed Apps:", this.sidebar_items.allowedApps);
+		
+		let app_workspaces = app_workspaces_data.filter(entry =>
+		this.sidebar_items.allowedApps.some(allowed => allowed.name === entry)
+		);
+		
 		let parent_pages = this.all_pages.filter((p) => !p.parent_page).uniqBy((p) => p.name);
 		if (frappe.current_app === "private") {
 			parent_pages = parent_pages.filter((p) => !p.public);
@@ -372,7 +386,7 @@ frappe.ui.Sidebar = class Sidebar {
 									: `<span class="indicator ${item.indicator_color}"></span>`
 							}
 						</span>
-						<span class="sidebar-item-label">${__(item.title)}<span>
+						<span class="sidebar-item-label">${__(this.replaceKeywords(this.sidebar_items.allowedApps.find(x => x.name === item.name)?.title || item.title))}<span>
 					</a>
 					<div class="sidebar-item-control"></div>
 				</div>
