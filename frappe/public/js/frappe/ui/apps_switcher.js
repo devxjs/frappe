@@ -11,8 +11,9 @@ frappe.ui.AppsSwitcher = class AppsSwitcher {
 	make() {
 		this.wrapper = $(
 			frappe.render_template("apps_switcher", {
-				app_logo_url: frappe.boot.app_data[0].app_logo_url,
-				app_title: __(frappe.boot.app_data[0].app_title),
+				app_logo_url: frappe.boot.branding_setting.logo,//frappe.boot.app_data[0].app_logo_url,
+				app_title: __(frappe.boot.app_data[0].app_title),				 
+				logo_height:frappe.boot.branding_setting.system_navbar_logo_height || 60,
 			})
 		).prependTo(this.sidebar_wrapper);
 		this.app_switcher_dropdown = $(".app-switcher-dropdown");
