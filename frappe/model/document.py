@@ -140,14 +140,14 @@ def get_doc_from_dict(data: dict[str, Any], **kwargs) -> "Document":
 	raise ImportError(data["doctype"])
 
 
-def get_lazy_doc(doctype: str, name: str) -> "Document":
+def get_lazy_doc(doctype: str, name: str, *, for_update=None) -> "Document":
 	if doctype == "DocType":
 		warnings.warn("DocType doesn't support lazy loading", stacklevel=1)
 		return get_doc(doctype, name)
 
 	controller = get_lazy_controller(doctype)
 	if controller:
-		return controller(doctype, name)
+		return controller(doctype, name, for_update=for_update)
 	raise ImportError(doctype)
 
 
@@ -176,36 +176,27 @@ class Document(BaseDocument):
 		self.name = None
 		self.flags = frappe._dict()
 		if args:
-			self._init_dispatch(args[0], *args[1:], **kwargs)
-		elif kwargs:
-			self._init_from_kwargs(kwargs)
-		else:
-			raise ValueError("Illegal arguments")
+			first_arg = args[0]
+			if isinstance(first_arg, str):
+				self.doctype = first_arg
+				self.name = first_arg if len(args) == 1 else args[1]
 
-	def _init_from_kwargs(self, kwargs):
-		super().__init__(kwargs)
-		self.init_child_tables()
-		self.init_valid_columns()
+				# for_update is set in flags to avoid changing load_from_db signature
+				# since it is used in virtual doctypes and inherited in child classes
+				self.flags.for_update = kwargs.get("for_update", False)
+				self.load_from_db()
+				return
 
-	def _init_known_doc(self, doctype, name, **kwargs):
-		self.doctype = doctype
-		self.name = name
-		# for_update is set in flags to avoid changing load_from_db signature
-		# since it is used in virtual doctypes and inherited in child classes
-		self.flags.for_update = kwargs.get("for_update")
-		self.load_from_db()
-		if kwargs:  # ad-hoc overrides
-			self._init_from_kwargs(kwargs)
+			if isinstance(first_arg, dict):
+				kwargs = first_arg
 
-	def _init_dispatch(self, arg, *args, **kwargs):
-		if isinstance(arg, str):
-			name = args[0] if args else arg
-			return self._init_known_doc(arg, name, **kwargs)
+		if kwargs:
+			super().__init__(kwargs)
+			self.init_child_tables()
+			self.init_valid_columns()
+			return
 
-		if isinstance(arg, dict):
-			return self._init_from_kwargs(arg)
-
-		raise ValueError(f"Unsupported argument type: {type(arg)}")
+		raise ValueError("Illegal arguments")
 
 	@property
 	def is_locked(self):
@@ -1989,16 +1980,10 @@ class LazyDocument:
 		return super().get(key, filters, limit, default)
 
 	@override
-	def extend(self: Document, key, value):
-		# Ensure that table descriptor is triggered at least once
-		if isinstance(key, str) and key in self._table_fieldnames:
-			getattr(self, key, None)
-		return super().extend(key, value)
-
-	@override
 	def append(self, key: str, value: D | dict | None = None, position: int = -1) -> D:
-		if isinstance(key, str) and key in self._table_fieldnames:
-			getattr(self, key, None)
+		# Ensure that table descriptor is triggered at least once
+		# key is assumed to be a table fieldname (as expected by BaseDocument.append)
+		getattr(self, key, None)
 		return super().append(key, value, position)
 
 	@override
@@ -2010,6 +1995,11 @@ class LazyDocument:
 				continue
 			for doc in self.get(fieldname):
 				doc.db_update()
+
+	@override
+	def init_child_tables(self):
+		# Avoid initializing anything, descriptor handles it.
+		return
 
 
 class LazyChildTable:
