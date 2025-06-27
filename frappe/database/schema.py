@@ -175,6 +175,9 @@ class DBTable:
 		pass
 
 
+NOT_NULL_TYPES = ("Check", "Int", "Currency", "Float", "Percent")
+
+
 class DbColumn:
 	def __init__(
 		self,
@@ -216,13 +219,14 @@ class DbColumn:
 		default = None
 		unique = False
 
+		if self.fieldtype in NOT_NULL_TYPES:
+			null = False
+
 		if self.fieldtype in ("Check", "Int"):
 			default = cint(self.default)
-			null = False
 
 		elif self.fieldtype in ("Currency", "Float", "Percent"):
 			default = flt(self.default)
-			null = False
 
 		elif (
 			self.default
@@ -271,7 +275,10 @@ class DbColumn:
 			return
 
 		# type
-		if current_def["type"] != column_type:
+		if current_def["type"] != column_type and not (
+			# XXX: MariaDB JSON is same as longtext and information schema still returns longtext
+			current_def["type"] == "longtext" and column_type == "json" and frappe.db.db_type == "mariadb"
+		):
 			self.table.change_type.append(self)
 
 		# unique
@@ -289,7 +296,11 @@ class DbColumn:
 			self.table.set_default.append(self)
 
 		# nullability
-		if self.not_nullable is not None and (self.not_nullable != current_def.get("not_nullable")):
+		if (
+			self.not_nullable is not None
+			and (self.not_nullable != current_def.get("not_nullable"))
+			and self.fieldtype not in NOT_NULL_TYPES
+		):
 			self.table.change_nullability.append(self)
 
 		# index should be applied or dropped irrespective of type change
@@ -305,26 +316,37 @@ class DbColumn:
 		else:
 			cur_default = current_def.get("default")
 			new_default = self.default
-			if cur_default == "NULL" or cur_default is None:
+			if cur_default == "NULL":
 				cur_default = None
 			else:
 				# Strip quotes from default value
 				# eg. database returns default value as "'System Manager'"
-				cur_default = cur_default.lstrip("'").rstrip("'")
+				cur_default = cur_default.lstrip("'").rstrip("'").replace("\\\\", "\\")
 
 			fieldtype = self.fieldtype
+			db_field_type = frappe.db.type_map.get(fieldtype)
 			if fieldtype in ["Int", "Check"]:
 				cur_default = cint(cur_default)
 				new_default = cint(new_default)
 			elif fieldtype in ["Currency", "Float", "Percent"]:
 				cur_default = flt(cur_default)
 				new_default = flt(new_default)
+			elif db_field_type and db_field_type[0] in ("varchar", "longtext", "text"):
+				new_default = cstr(new_default)
+				if not current_def.get("not_nullable"):
+					cur_default = cstr(cur_default)
 			return cur_default != new_default
 
 	def default_changed_for_decimal(self, current_def):
 		try:
 			if current_def["default"] in ("", None) and self.default in ("", None):
-				# both none, empty
+				return False
+
+			elif (
+				current_def["default"]
+				and flt(current_def["default"]) == 0.0
+				and self.default in ("", None, 0.0)
+			):
 				return False
 
 			elif current_def["default"] in ("", None):
